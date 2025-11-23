@@ -1,5 +1,6 @@
-﻿/target/
+﻿/backend/target/
+/backend/*.db
+/frontend/dist/
 /node_modules/
 /.vscode/
-*.log
-.DS_Store
+/*.log
