@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: crudguga-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/crudguga
+    username: crudguga
+    password: ENC(y+QSXa3ePM27nbqzq78Z8w8xZb71LlGb/Q4sxKtFqinadlfSEbt6O9cV6O74pY+L)
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+server:
+  port: 8081
+  address: 0.0.0.0
+  
+logging:
+  level:
+    root: INFO
+
+app:
+  frontend:
+    origin: http://192.168.100.44:5174
