@@ -16,6 +16,12 @@ export async function getUsuarios(username, password) {
   return Array.isArray(data.content) ? data.content : data;
 }
 
+export async function getUsuario(username, password, id) {
+  const res = await fetch(`${API_URL}/api/usuarios/${id}`, { headers: authHeader(username, password) });
+  if (!res.ok) throw new Error('Erro ao buscar usuário');
+  return await res.json();
+}
+
 export async function createUsuario(username, password, payload) {
   const res = await fetch(`${API_URL}/api/usuarios`, {
     method: 'POST',
