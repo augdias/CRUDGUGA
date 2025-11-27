@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://192.168.100.44:8081';
+import { createUsuario, deleteUsuario, getUsuarios, validateAuth } from './api.js';
 
 function App() {
   const [username, setUsername] = useState('');
@@ -18,23 +17,17 @@ function App() {
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
-  const fetchUsers = () => {
+  const fetchUsers = async () => {
     setFetchingUsers(true);
     setFetchError('');
-    fetch(`${API_URL}/api/usuarios`, {
-      headers: {
-        'Authorization': 'Basic ' + btoa(username + ':' + password),
-      },
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('Erro ao buscar usuários');
-        return res.json();
-      })
-      .then(data => {
-        setUsers(Array.isArray(data.content) ? data.content : data);
-      })
-      .catch(() => setFetchError('Erro ao buscar usuários.'))
-      .finally(() => setFetchingUsers(false));
+    try {
+      const data = await getUsuarios(username, password);
+      setUsers(data);
+    } catch (err) {
+      setFetchError('Erro ao buscar usuários.');
+    } finally {
+      setFetchingUsers(false);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -42,17 +35,9 @@ function App() {
     setLoading(true);
     setError('');
     try {
-      const resp = await fetch(`${API_URL}/api/usuarios`, {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Basic ' + btoa(username + ':' + password),
-        },
-      });
-      if (resp.ok) {
-        setIsLogged(true);
-      } else {
-        setError('Usuário ou senha inválidos.');
-      }
+      const ok = await validateAuth(username, password);
+      if (ok) setIsLogged(true);
+      else setError('Usuário ou senha inválidos.');
     } catch (err) {
       setError('Erro de conexão com o backend.');
     } finally {
@@ -77,15 +62,7 @@ function App() {
       return;
     }
     try {
-      const resp = await fetch(`${API_URL}/api/usuarios`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Basic ' + btoa(username + ':' + password),
-        },
-        body: JSON.stringify({ nome: formNome, email: formEmail, senha: formSenha })
-      });
-      if (!resp.ok) throw new Error('Erro ao cadastrar usuário');
+      await createUsuario(username, password, { nome: formNome, email: formEmail, senha: formSenha });
       setShowForm(false);
       setFormNome(''); setFormEmail(''); setFormSenha('');
       fetchUsers();
@@ -99,12 +76,7 @@ function App() {
   const handleDeleteUser = async (id) => {
     if (!window.confirm('Deseja realmente deletar este usuário?')) return;
     try {
-      await fetch(`${API_URL}/api/usuarios/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Basic ' + btoa(username + ':' + password),
-        },
-      });
+      await deleteUsuario(username, password, id);
       fetchUsers();
     } catch {
       alert('Erro ao deletar usuário.');
