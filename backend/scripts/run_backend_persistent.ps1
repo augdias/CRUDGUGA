@@ -25,7 +25,9 @@ if ($net) {
         Start-Sleep -Seconds 1
         Write-Info "Killed PID $pid"
     } catch {
-        Write-Err "Failed to kill PID $pid: $_"
+        # avoid variable parsing issues inside double-quoted strings
+        $err = $_
+        Write-Err ("Failed to kill PID {0}: {1}" -f $pid, $err)
     }
 } else {
     Write-Info "No process found on port $Port"
@@ -59,7 +61,8 @@ Write-Info "Port $Port is listening. Performing health check..."
 try {
     $health = curl.exe -s -u admin:123456 -H "Origin: http://localhost:5173" http://127.0.0.1:$Port/actuator/health -w "%{http_code}" -o $null
     if ($health -eq '200') { Write-Info "Health OK (200)"; exit 0 } else { Write-Err "Health check returned HTTP $health"; exit 4 }
-} catch {
-    Write-Err "Health request failed: $_"
-    exit 5
-}
+    } catch {
+        $err = $_
+        Write-Err ("Health request failed: {0}" -f $err)
+        exit 5
+    }
