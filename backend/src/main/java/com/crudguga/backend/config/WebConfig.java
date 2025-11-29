@@ -15,14 +15,29 @@ public class WebConfig {
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
-            @Override
-            public void addCorsMappings(CorsRegistry registry) {
+                @Override
+                public void addCorsMappings(CorsRegistry registry) {
+                // support multiple origins separated by comma in the property
+                String[] origins = frontendOrigin == null ? new String[0]
+                    : java.util.Arrays.stream(frontendOrigin.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toArray(String[]::new);
+
+                // API endpoints
                 registry.addMapping("/api/**")
-                        .allowedOrigins(frontendOrigin)
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                        .allowedHeaders("*")
-                        .allowCredentials(true);
-            }
+                    .allowedOrigins(origins)
+                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .allowedHeaders("*")
+                    .allowCredentials(true);
+
+                // Expose actuator endpoints to frontend origins as well
+                registry.addMapping("/actuator/**")
+                    .allowedOrigins(origins)
+                    .allowedMethods("GET", "POST", "OPTIONS")
+                    .allowedHeaders("*")
+                    .allowCredentials(true);
+                }
         };
     }
 }
