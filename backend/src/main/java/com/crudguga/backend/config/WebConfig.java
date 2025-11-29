@@ -27,14 +27,14 @@ public class WebConfig {
                 // API endpoints
                 registry.addMapping("/api/**")
                     .allowedOrigins(origins)
-                    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .allowedMethods("GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS")
                     .allowedHeaders("*")
                     .allowCredentials(true);
 
                 // Expose actuator endpoints to frontend origins as well
                 registry.addMapping("/actuator/**")
                     .allowedOrigins(origins)
-                    .allowedMethods("GET", "POST", "OPTIONS")
+                    .allowedMethods("GET", "HEAD", "POST", "OPTIONS")
                     .allowedHeaders("*")
                     .allowCredentials(true);
                 }
