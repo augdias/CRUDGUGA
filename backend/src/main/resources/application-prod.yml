@@ -25,4 +25,14 @@ logging:
 
 app:
   frontend:
-    origin: http://192.168.100.44:5174
+    # Permitir múltiplas origens (CSV). Adicionadas entradas locais para testes E2E e dev server Vite.
+    origin: http://192.168.100.44:5174,http://localhost:5173,http://127.0.0.1:5173
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized
