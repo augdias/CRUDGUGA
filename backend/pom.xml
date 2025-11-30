@@ -36,6 +36,12 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- Actuator to expose health and other management endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- REMOVA ou comente o sqlite-jdbc -->
         <!--
         <dependency>
