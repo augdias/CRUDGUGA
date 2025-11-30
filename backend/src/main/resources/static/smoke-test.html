@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>CRUDGUGA – Smoke Test</title>
+    <style>
+        :root {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #e2e8f0;
+            background: #0b1221;
+            color-scheme: dark;
+            --card-bg: #111a2d;
+            --card-border: #22304c;
+            --input-bg: #0f172a;
+            --input-border: #2b3a55;
+            --muted: #9ca7c7;
+            --primary: #3b82f6;
+            --secondary: #1f2937;
+            --secondary-text: #f3f4f6;
+        }
+
+        body {
+            margin: 2rem auto;
+            max-width: 720px;
+            padding: 0 1rem 2rem;
+            background: var(--card-bg);
+            color: inherit;
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 5px 20px rgba(15, 23, 42, 0.25);
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.6rem;
+            margin-top: 0.35rem;
+            border-radius: 6px;
+            border: 1px solid var(--input-border);
+            font-size: 0.95rem;
+            background: var(--input-bg);
+            color: inherit;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.85rem 1.25rem;
+            border: none;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .secondary {
+            background: var(--secondary);
+            color: var(--secondary-text);
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 220px;
+            margin-top: 1.25rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--input-border);
+            font-family: "JetBrains Mono", Consolas, monospace;
+            font-size: 0.9rem;
+            background: #040910;
+            color: #e2e8f0;
+        }
+
+        small {
+            display: block;
+            color: var(--muted);
+            margin-top: 0.35rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Smoke Test CRUDGUGA</h1>
+    <p class="card">
+        Esta página roda um fluxo automatizado (<strong>criar → consultar → listar → deletar</strong>) contra a API protegida por HTTP Basic.
+        Ajuste as credenciais e clique em "Executar smoke test" sempre que subir o backend no perfil <code>prod</code> para validar o PostgreSQL real.
+    </p>
+
+    <div class="card">
+        <label for="baseUrl">Base da API</label>
+        <input id="baseUrl" type="text" value="http://localhost:8081" placeholder="http://localhost:8081">
+        <small>Use a porta real em que o backend está rodando.</small>
+
+        <label for="basicUser">Usuário HTTP Basic</label>
+        <input id="basicUser" type="text" value="admin">
+
+        <label for="basicPass">Senha HTTP Basic</label>
+        <input id="basicPass" type="password" value="123456">
+
+        <div class="actions">
+            <button id="runSmoke" class="primary" onclick="runSmokeTest(event)">Executar smoke test</button>
+            <button class="secondary" onclick="clearLog(event)">Limpar log</button>
+        </div>
+
+        <label for="log">Log</label>
+        <textarea id="log" readonly></textarea>
+    </div>
+
+    <script>
+        const logArea = document.getElementById('log');
+
+        function clearLog(event) {
+            event?.preventDefault();
+            logArea.value = '';
+        }
+
+        function appendLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.value += `[${timestamp}] ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function buildConfig() {
+            const base = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+            const user = document.getElementById('basicUser').value;
+            const pass = document.getElementById('basicPass').value;
+
+            if (!base.startsWith('http')) {
+                throw new Error('Informe uma URL base válida (ex.: http://localhost:8081)');
+            }
+
+            return {
+                baseUrl: base,
+                authHeader: 'Basic ' + btoa(`${user}:${pass}`)
+            };
+        }
+
+        async function apiFetch(config, path, options = {}) {
+            const url = `${config.baseUrl}${path}`;
+            const headers = Object.assign({
+                'Content-Type': 'application/json',
+                'Authorization': config.authHeader
+            }, options.headers ?? {});
+
+            const response = await fetch(url, { ...options, headers });
+            let payload;
+            const text = await response.text();
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch (error) {
+                payload = { raw: text };
+            }
+
+            if (!response.ok) {
+                const message = payload?.mensagem || JSON.stringify(payload);
+                throw new Error(`HTTP ${response.status} - ${message}`);
+            }
+            return payload;
+        }
+
+        async function runSmokeTest(event) {
+            event?.preventDefault();
+            const button = document.getElementById('runSmoke');
+            button.disabled = true;
+
+            try {
+                const config = buildConfig();
+                appendLog('Iniciando smoke test...');
+
+                const nome = `Smoke-${new Date().toISOString()}`;
+                const novoUsuario = { nome, senha: 'senha123' };
+
+                const criado = await apiFetch(config, '/usuarios', {
+                    method: 'POST',
+                    body: JSON.stringify(novoUsuario)
+                });
+                appendLog(`Usuário criado (id=${criado.id}, nome=${criado.nome}).`);
+
+                const consultado = await apiFetch(config, `/usuarios/${criado.id}`);
+                appendLog(`Busca por ID OK (${consultado.nome}).`);
+
+                const pagina = await apiFetch(config, '/usuarios?page=0&size=5&sortBy=nome&direction=asc');
+                const quantidade = pagina.numberOfElements ?? pagina.content?.length ?? 0;
+                appendLog(`Listagem retornou ${quantidade} registros na página 0.`);
+
+                await apiFetch(config, `/usuarios/${criado.id}`, { method: 'DELETE' });
+                appendLog('Usuário temporário deletado.');
+
+                appendLog('✅ Smoke test finalizado com sucesso.');
+            } catch (error) {
+                appendLog(`❌ ERRO: ${error.message}`);
+            } finally {
+                button.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+🔧 Tecnologias usadas:
+Java 23 (JDK 23)
+Spring Boot
+H2 Database
+Spring Data JPA
+Lombok
+Maven
+
+quero criar um aplicativo CRUD Java com Spring Boot com nome de CRUDGUGA para rodar em windows e android  2025

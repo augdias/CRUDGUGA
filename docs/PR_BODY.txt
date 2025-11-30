@@ -1,0 +1,24 @@
+Título: Parametrize frontend API URL and backend CORS
+
+O que foi feito:
+- Substituí URLs hardcoded no frontend por `VITE_API_URL` (com fallback) e adicionei `frontend/.env.example`.
+- Tornei CORS configurável no backend via property `app.frontend.origin` e adicionei essa propriedade em `application-dev.yml` e `application-prod.yml`.
+- Corrigi um teste de controller (`UsuarioControllerTest`) para usar `USUARIOS_ID`.
+- Atualizei `backend/.github/copilot-instructions.md` e adicionei `docs/PROJECT_ANALYSIS.md` com análise do projeto.
+
+Por que:
+- Facilita desenvolvimento local e portabilidade do frontend entre máquinas/ambientes.
+- Evita alterações de código ao trocar a URL da API; simplifica configuração CORS.
+
+Testes realizados:
+- Rodei `mvn -Dtest=UsuarioControllerTest test` localmente; os testes desta classe passaram.
+
+Checklist para reviewers:
+- [ ] Validar `WebConfig` (a propriedade `app.frontend.origin` tem fallback para `http://192.168.100.44:5174` — ajustar se necessário em produção).
+- [ ] Conferir substituições em `App.jsx` e se `VITE_API_URL` atende ao fluxo de dev.
+- [ ] Confirmar que o frontend não possui histórico de commits que precisem ser preservados (se optamos por remover `frontend/.git`).
+
+Notas:
+- Para rodar o frontend apontando para a API local, crie `.env.local` na pasta `frontend` com:
+  VITE_API_URL=http://localhost:8081
+- Se preferir manter o frontend como repositório separado, considere usar submodule em vez de remover `.git`.
