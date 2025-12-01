@@ -1,0 +1,194 @@
+Vou explicar o fluxo usando o exemplo de `POST /usuarios`, porque ele envolve tudo (entrada, validação simples, persistência e resposta). O mesmo raciocínio vale para GET/PUT/DELETE.
+
+**1. Chegada da requisição HTTP**
+
+- Cliente (Postman, app, browser) manda:
+  - Método: `POST`
+  - URL: `http://localhost:8081/usuarios`
+  - Headers:
+    - `Authorization: Basic ...` (admin / 123456)
+    - `Content-Type: application/json`
+  - Body:
+    ```json
+    {
+      "nome": "Guga",
+      "senha": "123456"
+    }
+    ```
+- A requisição chega no Tomcat embutido do Spring Boot (configurado pela classe `CrudGugaApplication`).
+
+**2. Segurança (Spring Security / `SecurityConfig`)**
+
+- Antes de chegar no controller, o filtro de segurança confere:
+  - Se a URL `/usuarios` exige autenticação (no seu `SecurityConfig`, exige).
+  - Se o header `Authorization` com user `admin` / senha `123456` é válido.
+- Se for inválido:
+  - Spring responde `401 Unauthorized` e a requisição nem chega no controller.
+- Se for válido:
+  - A requisição segue para o DispatcherServlet (núcleo do Spring MVC).
+
+**3. DispatcherServlet localiza o controller**
+
+- O Spring procura um método anotado que case com:
+  - Método HTTP: `POST`
+  - Caminho: `/usuarios`
+- Ele encontra, em `UsuarioController`:
+
+```java
+@RestController
+@RequestMapping("/usuarios")
+public class UsuarioController {
+
+    @PostMapping
+    public ResponseEntity<UsuarioDTO> criar(@RequestBody UsuarioRequestDTO dto) {
+        UsuarioDTO criado = service.criar(dto);
+        URI location = URI.create("/usuarios/" + criado.getId());
+        return ResponseEntity.created(location).body(criado);
+    }
+}
+```
+
+**4. Desserialização do JSON para `UsuarioRequestDTO`**
+
+- O Spring vê o parâmetro `@RequestBody UsuarioRequestDTO dto`.
+- Usa o Jackson para transformar o JSON do corpo em um objeto Java:
+  - `dto.getNome()` → `"Guga"`
+  - `dto.getSenha()` → `"123456"`
+- Se o JSON estiver inválido (campos quebrados, tipos errados), o Spring lança erro 400.
+
+**5. Controller chama o Service**
+
+- Dentro do método `criar`, você chama:
+
+```java
+UsuarioDTO criado = service.criar(dto);
+```
+
+- Aqui o controller não sabe nada de JPA, nem de banco; só delega a “regra de negócio” para o `UsuarioService`.
+
+**6. Lógica de negócio no `UsuarioService`**
+
+No `UsuarioService`:
+
+```java
+public UsuarioDTO criar(UsuarioRequestDTO dto) {
+    Usuario usuario = new Usuario();
+    usuario.setNome(dto.getNome());
+    usuario.setSenha(dto.getSenha());
+    Usuario salvo = repository.save(usuario);
+    return new UsuarioDTO(salvo.getId(), salvo.getNome());
+}
+```
+
+Passo a passo:
+
+1. Cria uma entidade JPA `Usuario` (objeto que representa a tabela `usuarios`):
+   - `usuario.setNome(dto.getNome());`
+   - `usuario.setSenha(dto.getSenha());`
+
+2. Chama o repositório:
+
+```java
+Usuario salvo = repository.save(usuario);
+```
+
+- Aqui entra o Spring Data JPA:
+  - Vê que `repository` é um `JpaRepository<Usuario, Long>`.
+  - Usa o `EntityManager`/Hibernate para:
+    - Abrir transação.
+    - Gerar SQL do tipo:
+      ```sql
+      insert into usuarios (nome, senha, id) values (?, ?, ?)
+      ```
+      (ou equivalente, dependendo do dialeto/H2).
+    - Executar no banco H2.
+    - Receber o `id` gerado.
+    - Preencher `salvo.setId(1L)` (por exemplo).
+
+3. Monta o DTO de saída:
+
+```java
+return new UsuarioDTO(salvo.getId(), salvo.getNome());
+```
+
+- Aqui você decide explicitamente não devolver a senha.
+
+**7. Repository → Banco H2**
+
+- O `UsuarioRepository` é bem simples:
+
+```java
+public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
+}
+```
+
+- O Spring cria uma implementação concreta em runtime.
+- Essa implementação usa:
+  - Configuração do datasource (`application.properties` com URL H2).
+  - Configuração JPA/Hibernate.
+- Na chamada a `save(usuario)`:
+  - Tradução da entidade `Usuario` em SQL.
+  - Execução no H2 (arquivo `./data/crudguga`).
+  - Retorno de um objeto gerenciado com `id` preenchido.
+
+**8. Service devolve DTO para o Controller**
+
+- O `UsuarioService.criar` devolve `UsuarioDTO` para o controller:
+
+```java
+UsuarioDTO criado = service.criar(dto);
+```
+
+Agora o controller tem um objeto Java simples para enviar para a resposta HTTP.
+
+**9. Montagem da resposta HTTP no Controller**
+
+No `UsuarioController`:
+
+```java
+URI location = URI.create("/usuarios/" + criado.getId());
+return ResponseEntity.created(location).body(criado);
+```
+
+- `ResponseEntity.created(location)`:
+  - Define o status HTTP para `201 Created`.
+  - Define o header `Location: /usuarios/{id}`.
+- `.body(criado)`:
+  - Diz para o Spring: “serialize este objeto como JSON no corpo da resposta”.
+
+**10. Serialização JSON de volta para o cliente**
+
+- O Spring usa Jackson novamente para converter `UsuarioDTO` em JSON:
+  ```json
+  {
+    "id": 1,
+    "nome": "Guga"
+  }
+  ```
+- Envia para o cliente com:
+  - Status: `201`
+  - Headers: `Content-Type: application/json`, `Location: /usuarios/1`
+  - Body: o JSON acima.
+
+**Resumo em camadas (mentalmente)**
+
+- **Controller (`UsuarioController`)**
+  - Camada HTTP/REST.
+  - Converte HTTP ↔ objetos Java (DTOs).
+  - Chama serviços, não mexe em banco.
+
+- **Service (`UsuarioService`)**
+  - Camada de negócio.
+  - Aplica regras (aqui simples: montar entidade, decidir o que expor).
+  - Orquestra repositórios.
+
+- **Repository (`UsuarioRepository`)**
+  - Camada de acesso a dados.
+  - Encapsula JPA/Hibernate.
+  - Trabalha com entidades (`Usuario`) e tipos do banco.
+
+- **Entity (`Usuario`) + JPA/Hibernate**
+  - Representa tabelas/relacionamentos.
+  - Cuida de traduzir operações Java em SQL para o H2.
+
+Se você quiser, no próximo passo posso fazer o mesmo “passeio” detalhado, mas agora com `GET /usuarios/{id}` mostrando onde entra o caso de 404 (quando o `Optional` vem vazio) e como o Spring transforma isso na resposta HTTP.

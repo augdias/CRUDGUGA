@@ -1,0 +1,1 @@
+// Arquivo de teste movido para src/test/java.
